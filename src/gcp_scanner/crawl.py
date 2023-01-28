@@ -977,31 +977,38 @@ def get_service_accounts(project_name: str,
 
 
 def list_services(project_id: str, credentials: Credentials) -> List[Any]:
-  """Retrieve a list of services enabled in the project.
+    """Retrieve a list of services enabled in the project.
 
-  Args:
-    project_name: An id of a project to query info about.
-    credentials: An google.oauth2.credentials.Credentials object.
+    Args:
+        project_id: An id of a project to query info about.
+        credentials: An google.oauth2.credentials.Credentials object.
 
-  Returns:
-    A list of service API objects enabled in the project.
-  """
+    Returns:
+        A list of service API objects enabled in the project.
+    """
 
-  logging.info("Retrieving services list %s", project_id)
-  list_of_services = list()
-  serviceusage = discovery.build("serviceusage", "v1", credentials=credentials)
+    logging.info("Retrieving services list %s", project_id)
+    list_of_services = list()
+    serviceusage = discovery.build("serviceusage", "v1", credentials=credentials)
 
-  request = serviceusage.services().list(
-      parent="projects/" + project_id, pageSize=200, filter="state:ENABLED")
-  try:
-    while request is not None:
-      response = request.execute()
-      list_of_services.append(response.get("services", None))
+    request = serviceusage.services().list(
+        parent="projects/" + project_id, pageSize=200, filter="state:ENABLED"
+    )
+    try:
+        while request is not None:
+            response = request.execute()
+            if not response.get("services"):
+                break
+            list_of_services.extend(response.get("services", []))
 
-      request = serviceusage.services().list_next(
-          previous_request=request, previous_response=response)
-  except Exception:
-    logging.info("Failed to retrive services for project %s", project_id)
-    logging.info(sys.exc_info())
+            request = serviceusage.services().list_next(
+                previous_request=request, previous_response=response
+            )
+    except Exception as e:
+        logging.info("Failed to retrieve services for project %s", project_id)
+        logging.info(e)
+    finally:
+        serviceusage.close()
+    return list_of_services
 
-  return list_of_services
+
